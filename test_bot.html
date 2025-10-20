@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fiber Bot Tester</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f0f0f0; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
+        .chat { background: #e5ddd5; padding: 15px; height: 400px; overflow-y: auto; border-radius: 10px; margin: 10px 0; }
+        .message { margin: 10px 0; padding: 8px 12px; border-radius: 15px; max-width: 80%; }
+        .user { background: #dcf8c6; margin-left: auto; text-align: right; }
+        .bot { background: white; margin-right: auto; }
+        input[type="text"] { width: 70%; padding: 10px; border: 1px solid #ddd; border-radius: 20px; }
+        button { padding: 10px 20px; background: #25D366; color: white; border: none; border-radius: 20px; cursor: pointer; }
+        button:hover { background: #20bd5a; }
+        .quick-buttons { margin: 10px 0; }
+        .quick-buttons button { margin: 5px; padding: 5px 15px; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Fiber Installation Bot Tester</h1>
+        
+        <div class="chat" id="chatArea">
+            <div class="message bot">Welcome! Test your fiber installation bot here.<br>Try: START, STATUS, HELP</div>
+        </div>
+        
+        <div class="quick-buttons">
+            <button onclick="sendMessage('START')">START</button>
+            <button onclick="sendMessage('STATUS')">STATUS</button>  
+            <button onclick="sendMessage('HELP')">HELP</button>
+            <button onclick="sendMessage('RESET')">RESET</button>
+        </div>
+        
+        <div>
+            <input type="text" id="messageInput" placeholder="Type your message..." onkeypress="handleEnter(event)">
+            <button onclick="sendUserMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const botUrl = 'https://thrifty-jaye-sleepily.ngrok-free.dev/webhook';
+        const testPhone = 'whatsapp:+27999888777';
+        
+        function addMessage(text, isUser) {
+            const chatArea = document.getElementById('chatArea');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+            messageDiv.innerHTML = text.replace(/\n/g, '<br>');
+            chatArea.appendChild(messageDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+        
+        async function sendMessage(message) {
+            addMessage(message, true);
+            
+            try {
+                const response = await fetch(botUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `From=${testPhone}&Body=${encodeURIComponent(message)}`
+                });
+                
+                const responseText = await response.text();
+                const messageMatch = responseText.match(/<Message>(.*?)<\/Message>/s);
+                const botMessage = messageMatch ? messageMatch[1] : 'Error: Invalid response';
+                
+                addMessage(botMessage, false);
+            } catch (error) {
+                addMessage(`Error: ${error.message}`, false);
+            }
+        }
+        
+        function sendUserMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            if (message) {
+                sendMessage(message);
+                input.value = '';
+            }
+        }
+        
+        function handleEnter(event) {
+            if (event.key === 'Enter') {
+                sendUserMessage();
+            }
+        }
+    </script>
+</body>
+</html>

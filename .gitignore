@@ -1,0 +1,82 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Node modules
+node_modules/
+
+# Session data
+data/sessions.json
+data/photos/
+
+# Temporary files
+*.tmp
+*.temp
+
+# ngrok
+ngrok
+
+# Archive files
+*.tgz
+*.tar.gz
+
+# Test outputs
+test_outputs/.env
+logs/verification.log
+TWILIO_CREDENTIALS.md
+
+# Gemini specific
+.claude/
+railway/
+ngrok-v3-stable-linux-amd64.tgz
