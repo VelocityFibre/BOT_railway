@@ -1,8 +1,10 @@
 from flask import Flask, request, Response, jsonify
 import logging
+import os
 from typing import Dict, Any
 from ..bot.bot import FiberInstallationBot
 from ..config import Config
+from ..db.database import save_installation, mark_resubmitted, test_connection
 
 logger = logging.getLogger(__name__)
 
@@ -249,3 +251,167 @@ def register_routes(app: Flask):
             except Exception as e:
                 logger.error(f"Error updating strictness settings: {e}")
                 return jsonify({"error": str(e)}), 500
+
+    # ==================== NEW ENDPOINTS FOR NEON INTEGRATION ====================
+
+    @app.route('/api/submit-installation', methods=['POST'])
+    def submit_installation():
+        """
+        Submit a completed installation to the database
+        Called when agent completes all 12 photos via WhatsApp
+
+        Request body:
+        {
+            "drop_number": "DR12345678",
+            "contractor_number": "+27640412391",
+            "project_name": "Velo Test"
+        }
+        """
+        try:
+            data = request.get_json()
+
+            if not data or 'drop_number' not in data:
+                return jsonify({"error": "drop_number is required"}), 400
+
+            drop_number = data['drop_number']
+            contractor_number = data.get('contractor_number', 'Unknown')
+            project_name = data.get('project_name', 'Velo Test')
+
+            logger.info(f"📥 Received installation submission: {drop_number} from {contractor_number}")
+
+            # Save to database
+            result = save_installation(drop_number, contractor_number, project_name)
+
+            if result['success']:
+                logger.info(f"✅ Installation {drop_number} saved successfully")
+                return jsonify(result), 200
+            else:
+                logger.error(f"❌ Failed to save installation {drop_number}: {result.get('error')}")
+                return jsonify(result), 500
+
+        except Exception as e:
+            logger.error(f"❌ Error in submit_installation: {str(e)}")
+            return jsonify({
+                "success": False,
+                "error": str(e)
+            }), 500
+
+    @app.route('/send', methods=['POST'])
+    def send_whatsapp():
+        """
+        Send WhatsApp message to a contractor
+        Called by Next.js dashboard when marking drop as incomplete
+
+        Request body:
+        {
+            "to": "+27640412391" or "whatsapp:+27640412391",
+            "message": "Your drop DR12345678 is incomplete..."
+        }
+        """
+        try:
+            # Verify API key
+            api_key = request.headers.get('X-API-Key')
+            expected_key = os.getenv('BRIDGE_API_KEY')
+
+            if expected_key and api_key != expected_key:
+                logger.warning(f"⚠️ Invalid API key attempt from {request.remote_addr}")
+                return jsonify({"error": "Unauthorized"}), 401
+
+            data = request.get_json()
+
+            if not data or 'to' not in data or 'message' not in data:
+                return jsonify({"error": "Both 'to' and 'message' are required"}), 400
+
+            to_number = data['to']
+            message = data['message']
+
+            # Ensure number has whatsapp: prefix for Twilio
+            if not to_number.startswith('whatsapp:'):
+                to_number = f"whatsapp:{to_number}"
+
+            logger.info(f"📤 Sending WhatsApp message to {to_number}")
+
+            # Send via Twilio
+            from twilio.rest import Client
+
+            client = Client(
+                Config.TWILIO_ACCOUNT_SID,
+                Config.TWILIO_AUTH_TOKEN
+            )
+
+            twilio_message = client.messages.create(
+                from_=f"whatsapp:{Config.WHATSAPP_NUMBER}",
+                to=to_number,
+                body=message
+            )
+
+            logger.info(f"✅ WhatsApp message sent successfully: SID={twilio_message.sid}")
+
+            return jsonify({
+                "success": True,
+                "message_sid": twilio_message.sid,
+                "to": to_number,
+                "status": twilio_message.status
+            }), 200
+
+        except Exception as e:
+            logger.error(f"❌ Failed to send WhatsApp message: {str(e)}")
+            return jsonify({
+                "success": False,
+                "error": str(e)
+            }), 500
+
+    @app.route('/api/resubmit', methods=['POST'])
+    def handle_resubmit():
+        """
+        Mark a drop as resubmitted
+        Called when agent sends "DR12345678 DONE" via WhatsApp
+
+        Request body:
+        {
+            "drop_number": "DR12345678"
+        }
+        """
+        try:
+            data = request.get_json()
+
+            if not data or 'drop_number' not in data:
+                return jsonify({"error": "drop_number is required"}), 400
+
+            drop_number = data['drop_number']
+
+            logger.info(f"🔄 Received resubmission for: {drop_number}")
+
+            # Update database
+            result = mark_resubmitted(drop_number)
+
+            if result['success']:
+                logger.info(f"✅ Drop {drop_number} marked as resubmitted")
+                return jsonify(result), 200
+            else:
+                logger.error(f"❌ Failed to mark {drop_number} as resubmitted: {result.get('error')}")
+                return jsonify(result), 500
+
+        except Exception as e:
+            logger.error(f"❌ Error in handle_resubmit: {str(e)}")
+            return jsonify({
+                "success": False,
+                "error": str(e)
+            }), 500
+
+    @app.route('/db/test', methods=['GET'])
+    def test_database():
+        """Test database connection"""
+        success, message = test_connection()
+
+        if success:
+            return jsonify({
+                "success": True,
+                "message": message,
+                "database": "Neon PostgreSQL"
+            }), 200
+        else:
+            return jsonify({
+                "success": False,
+                "error": message
+            }), 500

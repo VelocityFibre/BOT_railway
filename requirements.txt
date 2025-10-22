@@ -10,3 +10,5 @@ pytest-cov>=4.1.0
 black>=23.0.0
 flake8>=6.0.0
 gunicorn
+psycopg2-binary>=2.9.9
+sqlalchemy>=2.0.23
